@@ -255,8 +255,11 @@ public class ShaderCreator {
         }
 		// TODO: Is this check sound in newer versions?
 		boolean isLeash = vertexFormat == DefaultVertexFormat.POSITION_COLOR_LIGHTMAP;
-		String vertex = ShaderSynthesizer.vsh(true, inputs, fogMode, entityLighting, isLeash);
-		String fragment = ShaderSynthesizer.fsh(inputs, fogMode, alpha, intensityTex, isLeash);
+		// Sky programs fog the sky disc like vanilla does; the vertex stage only has to provide the distance.
+		boolean sky = (shaderKey.getProgram() == ProgramId.SkyBasic || shaderKey.getProgram() == ProgramId.SkyTextured)
+			&& fogMode == FogMode.OFF;
+		String vertex = ShaderSynthesizer.vsh(true, inputs, sky ? FogMode.PER_VERTEX : fogMode, entityLighting, isLeash);
+		String fragment = ShaderSynthesizer.fsh(inputs, fogMode, alpha, intensityTex, isLeash, sky);
 
 		ShaderPrinter.printProgram(name)
 			.addSource(PatchShaderType.VERTEX, vertex)
@@ -369,7 +372,7 @@ public class ShaderCreator {
 
         VertexFormat finalVertexFormat = vertexFormat;
         return new ShaderSupplier(shaderKey, id, () -> {
-			GlFramebuffer framebuffer = shadowSupplier.get().createShadowFramebuffer(ImmutableSet.of(), source.getDirectives().hasUnknownDrawBuffers() ? new int[]{0, 1} : source.getDirectives().getDrawBuffers());
+			GlFramebuffer framebuffer = shadowSupplier.get().createShadowFramebuffer(ImmutableSet.of(), source.getDirectives().getDrawBuffers());
 			try {
 				return new ExtendedShader(id.getFinally(), name, finalVertexFormat, tessControl != null || tessEval != null, framebuffer, framebuffer, blendModeOverride, alpha, uniforms -> {
 					CommonUniforms.addDynamicUniforms(uniforms, FogMode.PER_VERTEX);

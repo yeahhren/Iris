@@ -69,6 +69,7 @@ import net.irisshaders.iris.shaderpack.FilledIndirectPointer;
 import net.irisshaders.iris.shaderpack.ImageInformation;
 import net.irisshaders.iris.shaderpack.ShaderPack;
 import net.irisshaders.iris.shaderpack.loading.ProgramArrayId;
+import net.irisshaders.iris.pipeline.fallback.ShaderSynthesizer;
 import net.irisshaders.iris.shaderpack.loading.ProgramId;
 import net.irisshaders.iris.shaderpack.materialmap.BlockMaterialMapping;
 import net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings;
@@ -659,6 +660,12 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 	}
 
 	private ShaderSupplier createShader(String name, Optional<ProgramSource> source, ShaderKey key, Patch patch) throws IOException {
+		if (source.isEmpty() && key == ShaderKey.CLOUDS) {
+			// The fallback shader can't build cloud geometry, so packs without a clouds program would lose them.
+			source = Optional.of(new ProgramSource(ProgramId.Clouds.getSourceName(), ShaderSynthesizer.CLOUDS_VSH, null, null, null,
+				ShaderSynthesizer.CLOUDS_FSH, null, null, null));
+		}
+
 		if (source.isEmpty()) {
 			return createFallbackShader(name, key);
 		}

@@ -6,6 +6,29 @@ import net.irisshaders.iris.gl.state.FogMode;
 import net.irisshaders.iris.gl.state.ShaderAttributeInputs;
 
 public class ShaderSynthesizer {
+	public static final String CLOUDS_VSH = """
+		#version 120
+		varying vec4 color;
+
+		void main() {
+		    vec4 position = gl_ModelViewMatrix * gl_Vertex;
+		    gl_Position = gl_ProjectionMatrix * position;
+		    gl_FogFragCoord = length(position.xyz);
+		    color = gl_Color;
+		}
+		""";
+
+	public static final String CLOUDS_FSH = """
+		#version 120
+		varying vec4 color;
+
+		void main() {
+		    vec4 result = color;
+		    result.a *= 1.0 - clamp((gl_FogFragCoord - gl_Fog.start) * gl_Fog.scale, 0.0, 1.0);
+		    gl_FragData[0] = result;
+		}
+		""";
+
 	public static String vsh(boolean hasChunkOffset, ShaderAttributeInputs inputs, FogMode fogMode,
 							 boolean entityLighting, boolean isLeash) {
 		StringBuilder shader = new StringBuilder();
@@ -173,6 +196,11 @@ public class ShaderSynthesizer {
 	}
 
 	public static String fsh(ShaderAttributeInputs inputs, FogMode fogMode, AlphaTest alphaTest, boolean intensityTex, boolean isLeash) {
+		return fsh(inputs, fogMode, alphaTest, intensityTex, isLeash, false);
+	}
+
+	public static String fsh(ShaderAttributeInputs inputs, FogMode fogMode, AlphaTest alphaTest, boolean intensityTex, boolean isLeash,
+							 boolean sky) {
 		StringBuilder shader = new StringBuilder();
 		StringBuilder main = new StringBuilder();
 
@@ -263,6 +291,28 @@ public class ShaderSynthesizer {
 			main.append("    fogFactor = clamp(fogFactor, 0.0, 1.0);\n");
 
 			main.append("    color.rgb = mix(FogColor.rgb, color.rgb, fogFactor * FogColor.a);\n");
+		} else if (sky) {
+			// Matches vanilla's sky shader: linear fog over 0..FogSkyEnd, only while drawing the sky disc and
+			// void plane (IrisSkyFog is set by FallbackShader), since the sun, moon and stars are unfogged.
+			shader.append("""
+				layout(std140) uniform Fog {
+				    vec4 FogColor;
+				    float FogEnvironmentalStart;
+				    float FogEnvironmentalEnd;
+				    float FogRenderDistanceStart;
+				    float FogRenderDistanceEnd;
+				    float FogSkyEnd;
+				    float FogCloudsEnd;
+				};
+				in float vertexDistance;
+				uniform int IrisSkyFog = 0;
+				""");
+
+			main.append("    if (IrisSkyFog == 1) {\n");
+			// Capped at Iris' horizon cone radius (see HorizonRenderer), like the pack sky programs.
+			main.append("        float fogValue = clamp(vertexDistance / min(FogSkyEnd, 256.0), 0.0, 1.0);\n");
+			main.append("        color.rgb = mix(color.rgb, FogColor.rgb, fogValue * FogColor.a);\n");
+			main.append("    }\n");
 		}
 
 		main.append("    fragColor = color;\n");

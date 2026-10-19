@@ -6,10 +6,44 @@ import io.github.douira.glsl_transformer.ast.transform.ASTInjectionPoint;
 import io.github.douira.glsl_transformer.ast.transform.ASTParser;
 import net.irisshaders.iris.gl.blending.AlphaTests;
 import net.irisshaders.iris.gl.shader.ShaderType;
+import net.irisshaders.iris.pipeline.WorldRenderingPhase;
 import net.irisshaders.iris.pipeline.transform.PatchShaderType;
 import net.irisshaders.iris.pipeline.transform.parameter.VanillaParameters;
 
 public class VanillaTransformer {
+	private static void patchSkyFog(ASTParser t, TranslationUnit tree, Root root, VanillaParameters parameters) {
+		if (parameters.name == null) {
+			return;
+		}
+
+		if (parameters.name.equals("clouds")) {
+			tree.prependMainFunctionBody(t, "irisInt_Fog = iris_FogParameters(iris_fogP.FogColor, 0.0, 0.0, iris_fogP.FogCloudsEnd, "
+				+ "1.0 / iris_fogP.FogCloudsEnd);");
+			return;
+		}
+
+		if (!parameters.name.startsWith("sky_")) {
+			return;
+		}
+
+		tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS, "uniform int iris_RenderStage;");
+
+		String skyStage = "(iris_RenderStage == " + WorldRenderingPhase.SKY.ordinal() + " || iris_RenderStage == "
+			+ WorldRenderingPhase.VOID.ordinal() + ")";
+
+		if (root.identifierIndex.has("fogMode")) {
+			root.replaceReferenceExpressions(t, "fogMode", "(" + skyStage + " ? fogMode : 0)");
+		}
+
+		tree.prependMainFunctionBody(t, "if " + skyStage + " { float iris_skyFogEnd = min(iris_fogP.FogSkyEnd, 256.0); "
+			+ "irisInt_Fog = iris_FogParameters(iris_fogP.FogColor, 0.0, 0.0, iris_skyFogEnd, 1.0 / iris_skyFogEnd); } "
+			+ "else { irisInt_Fog = iris_FogParameters(iris_fogP.FogColor, 0.0, 1e30, 2e30, 1e-30); }");
+
+		if (parameters.type.glShaderType == ShaderType.VERTEX && root.identifierIndex.has("iris_FogFragCoord")) {
+			tree.appendMainFunctionBody(t, "if " + skyStage + " { iris_FogFragCoord = length((gl_ModelViewMatrix * gl_Vertex).xyz); }");
+		}
+	}
+
 	public static void transform(
 		ASTParser t,
 		TranslationUnit tree,
@@ -48,6 +82,8 @@ public class VanillaTransformer {
 				"float scale;" +
 				"};",
 			"iris_FogParameters irisInt_Fog = iris_FogParameters(iris_fogP.FogColor, 0.0, iris_fogP.FogEnvironmentalStart, iris_fogP.FogEnvironmentalEnd, 1.0 / (iris_fogP.FogEnvironmentalEnd - iris_fogP.FogEnvironmentalStart));");
+
+		patchSkyFog(t, tree, root, parameters);
 
 		tree.parseAndInjectNodes(t, ASTInjectionPoint.BEFORE_DECLARATIONS, """
 			layout(std140) uniform iris_DynamicTransforms {

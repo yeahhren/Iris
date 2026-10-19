@@ -114,6 +114,8 @@ public final class CommonUniforms {
 		}, StateUpdateNotifiers.blendFuncNotifier);
 
 		uniforms.uniform1i("renderStage", () -> GbufferPrograms.getCurrentPhase().ordinal(), StateUpdateNotifiers.phaseChangeNotifier);
+		uniforms.uniform1i("iris_RenderStage", () -> GbufferPrograms.getCurrentPhase().ordinal(), listener -> {
+		});
 	}
 
 	public static void addCommonUniforms(DynamicUniformHolder uniforms, IdMap idMap, PackDirectives directives, FrameUpdateNotifier updateNotifier, FogMode fogMode) {

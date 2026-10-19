@@ -117,7 +117,7 @@ public class ShadowCompositeRenderer {
 			} else {
 				pass.computes = new ComputeProgram[0];
 			}
-			int[] drawBuffers = source.getDirectives().hasUnknownDrawBuffers() ? new int[]{0, 1} : source.getDirectives().getDrawBuffers();
+			int[] drawBuffers = source.getDirectives().getDrawBuffers();
 
 			GlFramebuffer framebuffer = renderTargets.createColorFramebuffer(flipped, drawBuffers);
 

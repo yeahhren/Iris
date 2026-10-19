@@ -14,6 +14,8 @@ import net.irisshaders.iris.compat.SkipList;
 import net.irisshaders.iris.gl.blending.BlendModeOverride;
 import net.irisshaders.iris.gl.blending.DepthColorStorage;
 import net.irisshaders.iris.gl.framebuffer.GlFramebuffer;
+import net.irisshaders.iris.layer.GbufferPrograms;
+import net.irisshaders.iris.pipeline.WorldRenderingPhase;
 import net.irisshaders.iris.mixinterface.ShaderInstanceInterface;
 import net.irisshaders.iris.pipeline.IrisRenderingPipeline;
 import net.irisshaders.iris.uniforms.CapturedRenderingState;
@@ -34,6 +36,7 @@ public class FallbackShader extends GlProgram implements IrisProgram {
 
 	private final int FOG_DENSITY;
 	private final int FOG_IS_EXP2;
+	private final int SKY_FOG;
 	private final int gtexture;
 	private final int overlay;
 	private final int lightmap;
@@ -92,6 +95,7 @@ public class FallbackShader extends GlProgram implements IrisProgram {
 
 		this.FOG_DENSITY = GlStateManager._glGetUniformLocation(programId, "FogDensity");
 		this.FOG_IS_EXP2 = GlStateManager._glGetUniformLocation(programId, "FogIsExp2");
+		this.SKY_FOG = GlStateManager._glGetUniformLocation(programId, "IrisSkyFog");
 
 		this.gtexture = GlStateManager._glGetUniformLocation(programId, "gtexture");
 		this.overlay = GlStateManager._glGetUniformLocation(programId, "overlay");
@@ -143,6 +147,11 @@ public class FallbackShader extends GlProgram implements IrisProgram {
 				GL46C.glUniform1f(FOG_DENSITY, 0.0f);
 				GL46C.glUniform1i(FOG_IS_EXP2, 0);
 			}
+		}
+
+		if (SKY_FOG > -1) {
+			WorldRenderingPhase phase = GbufferPrograms.getCurrentPhase();
+			GL46C.glUniform1i(SKY_FOG, phase == WorldRenderingPhase.SKY || phase == WorldRenderingPhase.VOID ? 1 : 0);
 		}
 
 		GlStateManager._glUniform1i(gtexture, 0);
